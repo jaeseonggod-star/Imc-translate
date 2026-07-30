@@ -197,29 +197,14 @@
             const targetLangSelect = document.getElementById('target-lang');
             const srcTitle = document.getElementById('src-title');
             const transTitle = document.getElementById('trans-title');
-            
-            const ttsToggle = document.getElementById('tts-toggle');
 
-            // 상태 변수
             let recognition;
             let isRecording = false;
-            let sentencesCount = 0;
-            const MAX_SENTENCES = 20;
+            
+            // [모바일 환경 텍스트 중복/누적 버그 방지용 상태 변수]
+            let lastProcessedIndex = -1;
+            let lastProcessedText = "";
 
-            // 토글 버튼 스타일 제어
-            ttsToggle.addEventListener('change', function() {
-                const bg = this.nextElementSibling;
-                const dot = bg.nextElementSibling;
-                if (this.checked) {
-                    bg.classList.replace('bg-slate-300', 'bg-blue-500');
-                    dot.classList.add('translate-x-4');
-                } else {
-                    bg.classList.replace('bg-blue-500', 'bg-slate-300');
-                    dot.classList.remove('translate-x-4');
-                }
-            });
-
-            // Web Speech API 초기화
             if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 recognition = new SpeechRecognition();
@@ -228,14 +213,14 @@
                 
                 recognition.onstart = () => {
                     isRecording = true;
-                    statusIndicator.classList.remove('bg-slate-300', 'bg-red-500');
-                    statusIndicator.classList.add('bg-green-500', 'animate-pulse');
-                    statusText.textContent = '음성 듣는 중...';
-                    statusText.classList.add('text-green-600');
                     
-                    startBtn.disabled = true;
-                    stopBtn.disabled = false;
-                    startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    // 새 세션 시작 시 중복 방지 변수 초기화
+                    lastProcessedIndex = -1;
+                    lastProcessedText = "";
+                    
+                    statusIndicator.classList.remove('bg-gray-300', 'bg-red-500');
+                    statusIndicator.classList.add('bg-green-500', 'animate-pulse');
+                    statusText.textContent = '음성 인식 중...';
                     stopBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                     errorMessage.classList.add('hidden');
                 };
@@ -246,23 +231,44 @@
                     for (let i = event.resultIndex; i < event.results.length; ++i) {
                         if (event.results[i].isFinal) {
                             let text = event.results[i][0].transcript.trim();
+                            let textToTranslate = text;
                             
-                            // 원본 텍스트 추가
-                            const span = document.createElement('span');
-                            span.textContent = text + ' ';
-                            srcFinalText.appendChild(span);
-                            
-                            // 문장 수 카운트 증가 및 번역 호출
-                            updateSentenceCount(1);
-                            translateText(text);
+                            // [안드로이드 크롬 누적/반복 버그 해결 로직]
+                            // 모바일에서 이전 텍스트를 누적해서 다시 보내는 경우, 중복된 앞부분을 잘라냅니다.
+                            if (i === lastProcessedIndex) {
+                                if (text === lastProcessedText) continue; // 완전히 동일한 중복 이벤트 무시
+                                if (text.startsWith(lastProcessedText)) {
+                                    textToTranslate = text.substring(lastProcessedText.length).trim();
+                                }
+                            } else {
+                                if (lastProcessedText && text.startsWith(lastProcessedText) && text.length > lastProcessedText.length) {
+                                    textToTranslate = text.substring(lastProcessedText.length).trim();
+                                }
+                            }
 
+                            lastProcessedIndex = i;
+                            lastProcessedText = text;
+
+                            if (!textToTranslate) continue; // 새로 추가된 텍스트가 없으면 스킵
+                            
+                            const span = document.createElement('span');
+                            span.textContent = textToTranslate + ' ';
+                            koFinalText.appendChild(span);
+                            
+                            translateText(textToTranslate);
                         } else {
                             interimTranscript += event.results[i][0].transcript;
                         }
                     }
+                    
+                    // 중간 과정(interim) 텍스트 화면 표시 전 이전 확정 텍스트 중복 제거
+                    let displayInterim = interimTranscript.trim();
+                    if (lastProcessedText && displayInterim.startsWith(lastProcessedText)) {
+                        displayInterim = displayInterim.substring(lastProcessedText.length).trim();
+                    }
 
-                    srcInterimText.textContent = interimTranscript;
-                    scrollToBottom(srcContainer);
+                    koInterimText.textContent = displayInterim;
+                    scrollToBottom(koContainer);
                 };
 
                 recognition.onerror = (event) => {
