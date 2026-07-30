@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IMC 실시간 다국어 음성 번역</title>
+    <title>IMC 실시간 음성 번역 (고급 감지)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
         
         body {
             font-family: 'Noto Sans KR', sans-serif;
-            background-color: #F8FAFC; /* 깔끔한 슬레이트 화이트 배경 */
-            color: #0F172A;
+            background-color: #FDFBF7; 
+            color: #1A2B4C; 
         }
         
         .custom-shadow {
-            box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.08);
+            box-shadow: 0 4px 20px rgba(26, 43, 76, 0.05);
         }
 
         .scrollbar-hide::-webkit-scrollbar {
@@ -26,162 +26,142 @@
             scrollbar-width: none;
         }
 
-        /* 20문장 도달 시 리셋 애니메이션 효과 */
-        @keyframes fadeOutIn {
-            0% { opacity: 1; }
-            50% { opacity: 0; }
-            100% { opacity: 1; }
+        .wave-bar {
+            width: 3px;
+            height: 8px;
+            background-color: #3B82F6;
+            border-radius: 9999px;
+            animation: wave 1s ease-in-out infinite;
+            opacity: 0.5;
         }
-        .reset-anim {
-            animation: fadeOutIn 0.8s ease-in-out;
+        .wave-bar:nth-child(2) { animation-delay: 0.1s; }
+        .wave-bar:nth-child(3) { animation-delay: 0.2s; }
+        .wave-bar:nth-child(4) { animation-delay: 0.3s; }
+        .wave-bar:nth-child(5) { animation-delay: 0.4s; }
+        
+        @keyframes wave {
+            0%, 100% { height: 8px; opacity: 0.5; }
+            50% { height: 20px; opacity: 1; }
         }
     </style>
 </head>
-<body class="min-h-screen p-3 md:p-8 flex flex-col items-center">
+<body class="min-h-screen p-3 md:p-8 flex flex-col items-center bg-[#FDFBF7]">
 
-    <div id="error-message" class="hidden w-full max-w-6xl bg-red-100 text-red-700 p-3 md:p-4 rounded-xl mb-4 text-center font-medium text-sm md:text-base border border-red-200"></div>
+    <!-- 에러 메시지 -->
+    <div id="error-message" class="hidden w-full max-w-5xl bg-red-100 text-red-700 p-3 md:p-4 rounded-lg mb-4 text-center font-medium text-sm md:text-base"></div>
 
-    <header class="w-full max-w-6xl text-center mb-5 md:mb-8 mt-2 md:mt-4">
-        <h1 class="text-3xl md:text-5xl font-extrabold text-[#1E293B] mb-3 tracking-tight">IMC 실시간 다국어 번역</h1>
-        <p class="text-slate-500 text-sm md:text-base px-2">원하는 언어로 말하면 설정한 언어로 실시간 번역됩니다. (20문장 초과 시 자동 리셋)</p>
+    <header class="w-full max-w-5xl text-center mb-4 md:mb-6 mt-2 md:mt-4">
+        <h1 class="text-2xl md:text-4xl font-bold text-[#1A2B4C] mb-2 tracking-tight">IMC 실시간 음성 번역</h1>
+        <p class="text-gray-500 text-xs md:text-base px-2 mb-4">입력할 언어와 번역될 언어를 선택하고 말씀해 주세요.</p>
+        
+        <!-- 마이크 거리 관련 안내 팁 -->
+        <div class="mx-auto max-w-2xl bg-blue-50 border border-blue-100 text-blue-700 p-3 rounded-lg text-xs md:text-sm flex items-start text-left">
+            <svg class="w-5 h-5 mr-2 flex-shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <p><strong>인식률을 높이는 팁:</strong> 웹 브라우저 내장 음성 엔진은 마이크와 거리가 멀어지면 소리를 놓칠 수 있습니다. 가급적 기기 가까이에서 또박또박 말씀해 주시면 완벽하게 인식됩니다.</p>
+        </div>
     </header>
 
-    <div class="w-full max-w-6xl flex flex-col lg:flex-row items-center justify-between bg-white p-4 md:p-6 rounded-2xl custom-shadow mb-6 md:mb-8 border border-slate-100 gap-4 lg:gap-0">
+    <div class="w-full max-w-5xl flex flex-col md:flex-row items-center justify-between bg-white p-4 md:p-6 rounded-2xl custom-shadow mb-6 md:mb-8 border border-gray-100 gap-4">
         
-        <!-- 상태 표시 -->
-        <div class="flex items-center space-x-3 w-full lg:w-auto justify-center lg:justify-start bg-slate-50 lg:bg-transparent py-2 px-4 rounded-xl lg:p-0">
-            <div id="status-indicator" class="w-3 h-3 rounded-full bg-slate-300"></div>
-            <span id="status-text" class="text-slate-600 font-semibold text-sm md:text-base">대기 중</span>
-            <span id="sentence-counter" class="text-xs text-slate-400 font-medium ml-2 bg-slate-200 px-2 py-1 rounded-full">0 / 20</span>
+        <!-- 상태 표시 영역 (파형 포함) -->
+        <div class="flex items-center space-x-2 w-full md:w-auto justify-center md:justify-start bg-gray-50 md:bg-transparent py-3 px-4 rounded-lg md:py-0 md:px-0">
+            <div id="status-indicator" class="w-3 h-3 rounded-full bg-gray-300"></div>
+            <span id="status-text" class="text-gray-600 font-medium text-sm md:text-base min-w-[80px]">대기 중</span>
+            
+            <!-- 마이크 파형 시각화 -->
+            <div id="mic-waves" class="hidden flex items-center space-x-1 ml-2 h-5">
+                <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+            </div>
+            
+            <span id="sentence-counter" class="text-xs text-gray-400 font-medium ml-2 bg-gray-200 px-2 py-1 rounded-full">0 / 20</span>
         </div>
         
-        <!-- 언어 선택 및 제어부 -->
-        <div class="flex flex-col md:flex-row items-center space-y-3 md:space-y-0 md:space-x-3 w-full lg:w-auto">
+        <!-- 언어 선택 및 버튼 모음 -->
+        <div class="flex flex-col lg:flex-row items-center space-y-3 lg:space-y-0 lg:space-x-3 w-full md:w-auto">
             
-            <!-- 말하는 언어 (Source) -->
-            <div class="relative w-full md:w-auto flex items-center bg-slate-50 border border-slate-200 rounded-xl px-3">
-                <span class="text-xs font-bold text-slate-400 mr-2 whitespace-nowrap">입력:</span>
-                <select id="source-lang" class="w-full bg-transparent text-[#1E293B] py-3 pr-8 font-medium text-sm md:text-base focus:outline-none cursor-pointer appearance-none">
-                    <option value="ko" data-recog="ko-KR">한국어</option>
-                    <option value="en" data-recog="en-US">영어</option>
-                    <option value="zh-CN" data-recog="zh-CN">중국어</option>
-                    <option value="ja" data-recog="ja-JP">일본어</option>
-                    <option value="vi" data-recog="vi-VN">베트남어</option>
-                    <option value="ar" data-recog="ar-SA">아랍어</option>
-                    <option value="es" data-recog="es-ES">스페인어</option>
-                    <option value="pt" data-recog="pt-PT">포르투갈어</option>
-                    <option value="fr" data-recog="fr-FR">프랑스어</option>
-                </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            <div class="flex space-x-2 w-full lg:w-auto justify-center">
+                <!-- 말하는 언어 -->
+                <div class="relative w-full">
+                    <select id="source-lang" class="w-full appearance-none bg-gray-50 border border-gray-200 text-[#1A2B4C] py-2.5 pl-3 pr-8 rounded-xl font-medium text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2B4C]">
+                        <option value="ko" data-recog="ko-KR" data-name="한국어">입력: 한국어</option>
+                        <option value="en" data-recog="en-US" data-name="영어">입력: 영어</option>
+                        <option value="zh-CN" data-recog="zh-CN" data-name="중국어">입력: 중국어</option>
+                        <option value="ja" data-recog="ja-JP" data-name="일본어">입력: 일본어</option>
+                        <option value="vi" data-recog="vi-VN" data-name="베트남어">입력: 베트남어</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></div>
+                </div>
+
+                <!-- 번역할 언어 -->
+                <div class="relative w-full">
+                    <select id="target-lang" class="w-full appearance-none bg-blue-50 border border-blue-100 text-blue-800 py-2.5 pl-3 pr-8 rounded-xl font-bold text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="en" data-name="영어">번역: 영어</option>
+                        <option value="ko" data-name="한국어">번역: 한국어</option>
+                        <option value="zh-CN" data-name="중국어">번역: 중국어</option>
+                        <option value="ja" data-name="일본어">번역: 일본어</option>
+                        <option value="vi" data-name="베트남어">번역: 베트남어</option>
+                        <option value="es" data-name="스페인어">번역: 스페인어</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-blue-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></div>
                 </div>
             </div>
 
-            <!-- 아이콘 (->) -->
-            <div class="hidden md:block text-slate-400">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-            </div>
-
-            <!-- 번역할 언어 (Target) -->
-            <div class="relative w-full md:w-auto flex items-center bg-blue-50 border border-blue-100 rounded-xl px-3">
-                <span class="text-xs font-bold text-blue-500 mr-2 whitespace-nowrap">번역:</span>
-                <select id="target-lang" class="w-full bg-transparent text-blue-900 py-3 pr-8 font-bold text-sm md:text-base focus:outline-none cursor-pointer appearance-none">
-                    <option value="en" data-recog="en-US">영어</option>
-                    <option value="ko" data-recog="ko-KR">한국어</option>
-                    <option value="zh-CN" data-recog="zh-CN">중국어</option>
-                    <option value="ja" data-recog="ja-JP">일본어</option>
-                    <option value="vi" data-recog="vi-VN">베트남어</option>
-                    <option value="ar" data-recog="ar-SA">아랍어</option>
-                    <option value="es" data-recog="es-ES">스페인어</option>
-                    <option value="pt" data-recog="pt-PT">포르투갈어</option>
-                    <option value="fr" data-recog="fr-FR">프랑스어</option>
-                </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-blue-500">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </div>
-            </div>
-
-            <!-- 제어 버튼 모음 -->
-            <div class="flex space-x-2 w-full md:w-auto justify-center pt-2 md:pt-0">
-                <button id="start-btn" class="bg-[#1E293B] hover:bg-[#334155] text-white px-5 md:px-6 py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 flex-1 md:flex-none text-sm md:text-base shadow-md hover:shadow-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                    </svg>
-                    <span>마이크 켜기</span>
+            <div class="flex space-x-2 w-full lg:w-auto justify-center">
+                <button id="start-btn" class="bg-[#1A2B4C] hover:bg-[#2A406D] text-white px-5 py-2.5 rounded-xl font-medium transition-all flex items-center justify-center space-x-2 flex-1 lg:flex-none text-sm shadow-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                    <span>켜기</span>
                 </button>
-                <button id="stop-btn" disabled class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-5 md:px-6 py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed flex-1 md:flex-none text-sm md:text-base">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
-                    </svg>
+                <button id="stop-btn" disabled class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-5 py-2.5 rounded-xl font-medium transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed flex-1 lg:flex-none text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /></svg>
                     <span>중지</span>
                 </button>
             </div>
         </div>
     </div>
 
-    <main class="w-full max-w-6xl grid grid-cols-1 md:grid-cols-5 gap-4 md:gap-6 pb-8 h-auto">
+    <main class="w-full max-w-5xl grid grid-cols-1 md:grid-cols-5 gap-4 md:gap-6 pb-8">
         
         <!-- 원본 언어 인식 창 (비율 2) -->
-        <div class="md:col-span-2 bg-white rounded-2xl custom-shadow border border-slate-100 flex flex-col h-[40vh] md:h-[65vh]">
-            <div class="p-3 md:p-4 border-b border-slate-100 bg-slate-50/80 rounded-t-2xl flex justify-between items-center">
-                <h2 class="text-base md:text-lg font-bold text-[#1E293B] flex items-center">
-                    <span class="bg-white px-2 py-1 rounded text-xs text-slate-500 shadow-sm mr-2 border border-slate-200">원본</span>
-                    <span id="src-title">한국어</span>
+        <div class="md:col-span-2 bg-white rounded-2xl custom-shadow border border-gray-100 flex flex-col h-[35vh] md:h-[60vh]">
+            <div class="p-3 md:p-4 border-b border-gray-100 bg-gray-50/80 rounded-t-2xl">
+                <h2 class="text-sm md:text-base font-bold text-[#1A2B4C] flex items-center justify-between">
+                    <span>원본 <span id="src-title" class="text-blue-600">한국어</span></span>
                 </h2>
-                <!-- 읽어주기 토글 (옵션) -->
-                <label class="flex items-center cursor-pointer">
-                    <div class="relative">
-                        <input type="checkbox" id="tts-toggle" class="sr-only">
-                        <div class="block bg-slate-300 w-10 h-6 rounded-full transition-colors duration-300"></div>
-                        <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition transform duration-300"></div>
-                    </div>
-                    <span class="ml-2 text-xs font-medium text-slate-500">자동 읽기</span>
-                </label>
             </div>
-            <div id="src-container" class="p-4 md:p-6 flex-1 overflow-y-auto text-base md:text-lg leading-relaxed text-slate-700 scrollbar-hide">
-                <div id="src-final-text" class="inline"></div>
-                <div id="src-interim-text" class="inline text-blue-400 italic"></div>
+            <div id="src-container" class="p-4 flex-1 overflow-y-auto text-base leading-relaxed text-gray-700 scrollbar-hide transition-opacity duration-500">
+                <div id="src-final-text" class="inline font-medium"></div>
+                <div id="src-interim-text" class="inline text-gray-400 italic"></div>
             </div>
         </div>
 
-        <!-- 번역 결과 창 (크기 확대, 비율 3) -->
-        <div class="md:col-span-3 bg-white rounded-2xl custom-shadow border border-slate-100 flex flex-col h-[45vh] md:h-[65vh]">
-            <div class="p-3 md:p-4 border-b border-blue-900 bg-gradient-to-r from-[#1E293B] to-[#334155] rounded-t-2xl text-white flex justify-between items-center">
-                <h2 class="text-base md:text-lg font-bold flex items-center">
-                    <span class="bg-blue-500/30 px-2 py-1 rounded text-xs text-blue-100 shadow-sm mr-2 border border-blue-400/30">번역</span>
-                    <span id="trans-title">영어</span>
+        <!-- 번역 결과 창 (비율 3) -->
+        <div class="md:col-span-3 bg-white rounded-2xl custom-shadow border border-gray-100 flex flex-col h-[40vh] md:h-[60vh]">
+            <div class="p-3 md:p-4 border-b border-blue-900 bg-[#1A2B4C] rounded-t-2xl text-white flex justify-between items-center">
+                <h2 class="text-sm md:text-base font-bold flex items-center">
+                    <span>번역 결과 <span id="trans-title" class="text-blue-300">영어</span></span>
                 </h2>
                 <div class="flex space-x-2">
-                    <button id="copy-btn" class="bg-white/10 hover:bg-white/20 text-white text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                        복사
-                    </button>
-                    <button id="clear-btn" class="bg-red-500/20 hover:bg-red-500/40 text-white text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        초기화
-                    </button>
+                    <button id="copy-btn" class="bg-white/10 hover:bg-white/20 text-white text-xs px-3 py-1.5 rounded transition-colors flex items-center">복사</button>
+                    <button id="clear-btn" class="bg-red-500/80 hover:bg-red-500 text-white text-xs px-3 py-1.5 rounded transition-colors flex items-center">지우기</button>
                 </div>
             </div>
-            <div id="tgt-container" class="p-4 md:p-6 flex-1 overflow-y-auto text-lg md:text-xl lg:text-2xl font-medium leading-relaxed text-[#0F172A] scrollbar-hide bg-[#F8FAFC]/50">
+            <div id="tgt-container" class="p-4 md:p-6 flex-1 overflow-y-auto text-lg md:text-xl font-medium leading-relaxed text-gray-900 scrollbar-hide bg-gray-50/30 transition-opacity duration-500">
                 <div id="tgt-final-text"></div>
-                <div id="translating-indicator" class="hidden mt-3 text-sm text-blue-500 animate-pulse border-l-2 border-blue-500 pl-2 font-bold">실시간 번역 중...</div>
+                <div id="translating-indicator" class="hidden mt-2 text-xs text-blue-500 animate-pulse font-bold">실시간 번역 중...</div>
             </div>
         </div>
     </main>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // DOM 엘리먼트
             const startBtn = document.getElementById('start-btn');
             const stopBtn = document.getElementById('stop-btn');
-            const clearBtn = document.getElementById('clear-btn');
             const copyBtn = document.getElementById('copy-btn');
+            const clearBtn = document.getElementById('clear-btn');
             
             const statusIndicator = document.getElementById('status-indicator');
             const statusText = document.getElementById('status-text');
+            const micWaves = document.getElementById('mic-waves');
             const sentenceCounter = document.getElementById('sentence-counter');
             
             const srcFinalText = document.getElementById('src-final-text');
@@ -200,8 +180,11 @@
 
             let recognition;
             let isRecording = false;
+            let isIntendedStop = false; // 추가: 사용자가 직접 중지 버튼을 눌렀는지 추적
+            let sentencesCount = 0;
+            const MAX_SENTENCES = 20;
             
-            // [모바일 환경 텍스트 중복/누적 버그 방지용 상태 변수]
+            // 모바일 환경 텍스트 중복 누적 버그 방지용
             let lastProcessedIndex = -1;
             let lastProcessedText = "";
 
@@ -213,16 +196,40 @@
                 
                 recognition.onstart = () => {
                     isRecording = true;
-                    
-                    // 새 세션 시작 시 중복 방지 변수 초기화
+                    isIntendedStop = false; // 시작 시 강제 중지 상태 초기화
                     lastProcessedIndex = -1;
                     lastProcessedText = "";
                     
                     statusIndicator.classList.remove('bg-gray-300', 'bg-red-500');
                     statusIndicator.classList.add('bg-green-500', 'animate-pulse');
-                    statusText.textContent = '음성 인식 중...';
-                    stopBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    statusText.textContent = '마이크 켜짐';
+                    statusText.classList.add('text-green-600');
+                    
+                    startBtn.disabled = true; stopBtn.disabled = false;
+                    startBtn.classList.add('opacity-50'); stopBtn.classList.remove('opacity-50');
                     errorMessage.classList.add('hidden');
+                };
+
+                recognition.onsoundstart = () => {
+                    if(isRecording) {
+                        micWaves.classList.remove('hidden');
+                        statusText.textContent = '소리 감지됨';
+                    }
+                };
+                
+                recognition.onspeechstart = () => {
+                    if(isRecording) statusText.textContent = '음성 분석 중...';
+                };
+
+                recognition.onspeechend = () => {
+                    if(isRecording) statusText.textContent = '번역 대기 중...';
+                };
+
+                recognition.onsoundend = () => {
+                    if(isRecording) {
+                        micWaves.classList.add('hidden');
+                        statusText.textContent = '마이크 켜짐';
+                    }
                 };
 
                 recognition.onresult = (event) => {
@@ -233,10 +240,9 @@
                             let text = event.results[i][0].transcript.trim();
                             let textToTranslate = text;
                             
-                            // [안드로이드 크롬 누적/반복 버그 해결 로직]
-                            // 모바일에서 이전 텍스트를 누적해서 다시 보내는 경우, 중복된 앞부분을 잘라냅니다.
+                            // 모바일 중복 누적 버그 필터링 로직
                             if (i === lastProcessedIndex) {
-                                if (text === lastProcessedText) continue; // 완전히 동일한 중복 이벤트 무시
+                                if (text === lastProcessedText) continue;
                                 if (text.startsWith(lastProcessedText)) {
                                     textToTranslate = text.substring(lastProcessedText.length).trim();
                                 }
@@ -249,167 +255,143 @@
                             lastProcessedIndex = i;
                             lastProcessedText = text;
 
-                            if (!textToTranslate) continue; // 새로 추가된 텍스트가 없으면 스킵
+                            if (!textToTranslate) continue; 
                             
                             const span = document.createElement('span');
                             span.textContent = textToTranslate + ' ';
-                            koFinalText.appendChild(span);
+                            srcFinalText.appendChild(span);
                             
                             translateText(textToTranslate);
+                            updateSentenceCount(1);
                         } else {
                             interimTranscript += event.results[i][0].transcript;
                         }
                     }
                     
-                    // 중간 과정(interim) 텍스트 화면 표시 전 이전 확정 텍스트 중복 제거
                     let displayInterim = interimTranscript.trim();
                     if (lastProcessedText && displayInterim.startsWith(lastProcessedText)) {
                         displayInterim = displayInterim.substring(lastProcessedText.length).trim();
                     }
 
-                    koInterimText.textContent = displayInterim;
-                    scrollToBottom(koContainer);
+                    srcInterimText.textContent = displayInterim;
+                    scrollToBottom(srcContainer);
                 };
 
                 recognition.onerror = (event) => {
-                    // 의도적인 중지(aborted)나 침묵(no-speech) 시 발생하는 정상적인 이벤트는 에러 로그에서 완전히 제외합니다.
-                    if (event.error === 'aborted' || event.error === 'no-speech') {
-                        return; 
-                    }
+                    if (event.error === 'aborted' || event.error === 'no-speech') return; 
                     
-                    console.error('Speech recognition error:', event.error);
+                    console.error('STT 에러:', event.error);
                     if (event.error === 'not-allowed') {
-                        showError('마이크 권한이 거부되었습니다. 브라우저 설정에서 허용해주세요.');
-                        stopRecognition();
-                    } else if (event.error === 'network') {
-                        showError('네트워크 오류가 발생했습니다.');
-                        stopRecognition();
+                        showError('마이크 권한이 거부되었습니다. (모바일의 경우 URL이 https:// 로 시작하는지 꼭 확인하세요!)');
+                        isIntendedStop = true;
+                        resetUIState();
                     }
                 };
 
                 recognition.onend = () => {
-                    // 사용자가 명시적으로 중지하지 않았는데 끊긴 경우 자동 재시작 (딜레이 추가하여 에러 방지)
-                    if (isRecording) {
-                        setTimeout(() => {
-                            try { recognition.start(); } catch(e) { console.log("Restart error handled", e); }
-                        }, 500);
+                    micWaves.classList.add('hidden');
+                    
+                    // 핵심 수정: 사용자가 직접 중지 버튼을 누르지 않았다면(모바일이 멋대로 끈 거라면) 무조건 되살림
+                    if (!isIntendedStop) {
+                        setTimeout(() => { 
+                            try { 
+                                recognition.start(); 
+                            } catch(e) {
+                                // 브라우저가 재시작마저 막았다면 어쩔 수 없이 UI 종료 상태로 변경
+                                resetUIState();
+                            } 
+                        }, 250);
                     } else {
-                        statusIndicator.classList.remove('bg-green-500', 'animate-pulse');
-                        statusIndicator.classList.add('bg-slate-300');
-                        statusText.textContent = '대기 중';
-                        statusText.classList.remove('text-green-600');
-                        
-                        startBtn.disabled = false;
-                        stopBtn.disabled = true;
-                        startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                        stopBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                        srcInterimText.textContent = '';
+                        resetUIState();
                     }
                 };
             } else {
-                showError('현재 브라우저는 음성 인식을 지원하지 않습니다. 구글 크롬(Chrome)을 이용해주세요.');
-                startBtn.disabled = true;
-                startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                showError('현재 브라우저는 음성 인식을 지원하지 않습니다. 모바일 크롬(Chrome) 최신 버전을 이용해주세요.');
+                startBtn.disabled = true; startBtn.classList.add('opacity-50');
             }
 
-            // 이벤트 리스너들
             startBtn.addEventListener('click', () => {
                 if (recognition && !isRecording) {
                     try {
-                        isRecording = true; // 클릭 연타로 인한 꼬임 현상 방지
-                        const selectedSrcRecog = sourceLangSelect.options[sourceLangSelect.selectedIndex].dataset.recog;
-                        recognition.lang = selectedSrcRecog; // 선택된 언어로 설정
+                        // 모바일 HTTP 접속 경고
+                        if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                            showError('경고: 모바일에서는 보안 연결(https://) 환경이 아니면 마이크가 작동하지 않습니다!');
+                        }
+                        
+                        recognition.lang = sourceLangSelect.options[sourceLangSelect.selectedIndex].dataset.recog;
                         recognition.start();
-                    } catch (e) {
-                        isRecording = false;
-                        console.error('Recognition start error:', e);
-                    }
+                    } catch (e) {}
                 }
             });
 
-            stopBtn.addEventListener('click', () => stopRecognition());
+            stopBtn.addEventListener('click', () => {
+                isIntendedStop = true; // 사용자가 명시적으로 중지했음을 기록
+                if (recognition) {
+                    try { recognition.stop(); } catch (e) {}
+                }
+            });
             
             clearBtn.addEventListener('click', () => resetScreens(true));
 
             copyBtn.addEventListener('click', () => {
-                const textToCopy = tgtFinalText.innerText;
-                if(!textToCopy) return;
-                
-                const tempTextArea = document.createElement('textarea');
-                tempTextArea.value = textToCopy;
-                document.body.appendChild(tempTextArea);
-                tempTextArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(tempTextArea);
-                
-                const originalText = copyBtn.innerHTML;
-                copyBtn.innerHTML = '✔ 복사됨';
-                setTimeout(() => { copyBtn.innerHTML = originalText; }, 2000);
+                const text = tgtFinalText.innerText;
+                if(!text) return;
+                const ta = document.createElement('textarea');
+                ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+                copyBtn.textContent = '복사 완료!';
+                setTimeout(() => copyBtn.textContent = '복사', 2000);
             });
 
-            // 언어 선택 변경 이벤트
             sourceLangSelect.addEventListener('change', (e) => {
-                const selectedOption = e.target.options[e.target.selectedIndex];
-                srcTitle.textContent = selectedOption.textContent;
-                // 녹음 중이었다면 언어 변경을 위해 재시작
-                if(isRecording) {
-                    stopRecognition();
-                    setTimeout(() => startBtn.click(), 600);
+                srcTitle.textContent = e.target.options[e.target.selectedIndex].dataset.name;
+                if(isRecording) { 
+                    isIntendedStop = true; 
+                    try { recognition.stop(); } catch(e){} 
+                    setTimeout(() => startBtn.click(), 500); 
                 }
             });
 
             targetLangSelect.addEventListener('change', (e) => {
-                const selectedOption = e.target.options[e.target.selectedIndex];
-                transTitle.textContent = selectedOption.textContent;
+                transTitle.textContent = e.target.options[e.target.selectedIndex].dataset.name;
             });
 
-            function stopRecognition() {
-                if (recognition && isRecording) {
-                    isRecording = false;
-                    try {
-                        recognition.stop();
-                    } catch (e) {
-                        // 중지 프로세스 중 발생하는 내부 에러 무시
-                    }
-                }
+            function resetUIState() {
+                isRecording = false;
+                statusIndicator.classList.remove('bg-green-500', 'animate-pulse');
+                statusIndicator.classList.add('bg-gray-300');
+                statusText.textContent = '대기 중';
+                statusText.classList.remove('text-green-600');
+                
+                startBtn.disabled = false; stopBtn.disabled = true;
+                startBtn.classList.remove('opacity-50'); stopBtn.classList.add('opacity-50');
+                srcInterimText.textContent = '';
             }
 
-            function updateSentenceCount(addCount) {
-                sentencesCount += addCount;
+            function updateSentenceCount(count) {
+                sentencesCount += count;
                 sentenceCounter.textContent = `${sentencesCount} / ${MAX_SENTENCES}`;
-                
-                if (sentencesCount >= MAX_SENTENCES) {
-                    // 번역 API가 호출되고 완료될 시간을 약간 주기 위해 지연 초기화
-                    setTimeout(() => resetScreens(), 2000);
-                }
+                if (sentencesCount >= MAX_SENTENCES) setTimeout(resetScreens, 3000);
             }
 
             function resetScreens(manual = false) {
-                srcContainer.classList.add('reset-anim');
-                tgtContainer.classList.add('reset-anim');
-                
+                srcContainer.style.opacity = '0'; tgtContainer.style.opacity = '0';
                 setTimeout(() => {
-                    srcFinalText.innerHTML = '';
-                    tgtFinalText.innerHTML = '';
-                    sentencesCount = 0;
-                    sentenceCounter.textContent = `0 / ${MAX_SENTENCES}`;
-                    srcContainer.classList.remove('reset-anim');
-                    tgtContainer.classList.remove('reset-anim');
-                }, 400); // 애니메이션 중간 지점에서 텍스트 비우기
+                    srcFinalText.innerHTML = ''; tgtFinalText.innerHTML = '';
+                    sentencesCount = 0; sentenceCounter.textContent = `0 / ${MAX_SENTENCES}`;
+                    srcContainer.style.opacity = '1'; tgtContainer.style.opacity = '1';
+                }, 500);
             }
 
             async function translateText(text) {
                 if (!text) return;
-                
                 translatingIndicator.classList.remove('hidden');
                 
                 try {
                     const srcLang = sourceLangSelect.value;
                     const tgtLang = targetLangSelect.value;
                     
-                    // 언어가 같으면 번역 생략하고 바로 출력
                     if (srcLang === tgtLang) {
-                        appendTranslation(text, tgtLang);
+                        appendTranslation(text);
                         return;
                     }
 
@@ -418,46 +400,25 @@
                     const data = await response.json();
 
                     if (data && data.responseData && data.responseData.translatedText) {
-                        appendTranslation(data.responseData.translatedText, tgtLang);
-                    } else {
-                        throw new Error("Translation failed");
+                        appendTranslation(data.responseData.translatedText);
                     }
                 } catch (error) {
-                    console.error('Translation API Error:', error);
-                    const p = document.createElement('p');
-                    p.className = 'mb-3 text-red-500 text-sm md:text-base border-b border-slate-200/50 pb-2';
-                    p.textContent = "[번역 오류 발생]";
-                    tgtFinalText.appendChild(p);
+                    console.error(error);
                 } finally {
                     translatingIndicator.classList.add('hidden');
                 }
             }
 
-            function appendTranslation(translatedText, targetLangCode) {
+            function appendTranslation(translatedText) {
                 const p = document.createElement('p');
-                p.className = 'mb-4 border-b border-slate-200/50 pb-3 break-keep';
+                p.className = 'mb-4 border-b border-gray-200/50 pb-3 break-keep';
                 p.textContent = translatedText;
                 tgtFinalText.appendChild(p);
                 scrollToBottom(tgtContainer);
-
-                // 자동 읽기(TTS) 체크되어 있을 경우 실행
-                if (ttsToggle.checked && 'speechSynthesis' in window) {
-                    const selectedRecogLang = targetLangSelect.options[targetLangSelect.selectedIndex].dataset.recog;
-                    const utterance = new SpeechSynthesisUtterance(translatedText);
-                    utterance.lang = selectedRecogLang;
-                    window.speechSynthesis.speak(utterance);
-                }
             }
 
-            function scrollToBottom(element) {
-                element.scrollTop = element.scrollHeight;
-            }
-
-            function showError(msg) {
-                errorMessage.textContent = msg;
-                errorMessage.classList.remove('hidden');
-                setTimeout(() => errorMessage.classList.add('hidden'), 5000);
-            }
+            function scrollToBottom(element) { element.scrollTop = element.scrollHeight; }
+            function showError(msg) { errorMessage.textContent = msg; errorMessage.classList.remove('hidden'); }
         });
     </script>
 </body>
