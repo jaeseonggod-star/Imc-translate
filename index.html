@@ -184,9 +184,8 @@
             let sentencesCount = 0;
             const MAX_SENTENCES = 20;
             
-            // 모바일 환경 텍스트 중복 누적 버그 방지용
-            let lastProcessedIndex = -1;
-            let lastProcessedText = "";
+            // 모바일 환경 텍스트 중복 누적 버그 방지용 (수정됨)
+            let recognizedHistory = "";
 
             if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -197,8 +196,7 @@
                 recognition.onstart = () => {
                     isRecording = true;
                     isIntendedStop = false; // 시작 시 강제 중지 상태 초기화
-                    lastProcessedIndex = -1;
-                    lastProcessedText = "";
+                    recognizedHistory = ""; // 마이크 켤 때 누적 기록 싹 다 초기화
                     
                     statusIndicator.classList.remove('bg-gray-300', 'bg-red-500');
                     statusIndicator.classList.add('bg-green-500', 'animate-pulse');
@@ -233,47 +231,50 @@
                 };
 
                 recognition.onresult = (event) => {
-                    let interimTranscript = '';
+                    let currentFullFinal = "";
+                    let currentInterim = "";
 
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    // 1. 브라우저가 쥐고 있는 전체 누적 텍스트를 결합 (눈덩이 전체)
+                    for (let i = 0; i < event.results.length; ++i) {
                         if (event.results[i].isFinal) {
-                            let text = event.results[i][0].transcript.trim();
-                            let textToTranslate = text;
-                            
-                            // 모바일 중복 누적 버그 필터링 로직
-                            if (i === lastProcessedIndex) {
-                                if (text === lastProcessedText) continue;
-                                if (text.startsWith(lastProcessedText)) {
-                                    textToTranslate = text.substring(lastProcessedText.length).trim();
-                                }
-                            } else {
-                                if (lastProcessedText && text.startsWith(lastProcessedText) && text.length > lastProcessedText.length) {
-                                    textToTranslate = text.substring(lastProcessedText.length).trim();
-                                }
-                            }
-
-                            lastProcessedIndex = i;
-                            lastProcessedText = text;
-
-                            if (!textToTranslate) continue; 
-                            
-                            const span = document.createElement('span');
-                            span.textContent = textToTranslate + ' ';
-                            srcFinalText.appendChild(span);
-                            
-                            translateText(textToTranslate);
-                            updateSentenceCount(1);
+                            currentFullFinal += event.results[i][0].transcript;
                         } else {
-                            interimTranscript += event.results[i][0].transcript;
+                            currentInterim += event.results[i][0].transcript;
                         }
                     }
-                    
-                    let displayInterim = interimTranscript.trim();
-                    if (lastProcessedText && displayInterim.startsWith(lastProcessedText)) {
-                        displayInterim = displayInterim.substring(lastProcessedText.length).trim();
-                    }
 
-                    srcInterimText.textContent = displayInterim;
+                    // 2. 이전에 처리한 텍스트(recognizedHistory)와 비교하여 차이점(새 단어)만 추출
+                    if (currentFullFinal && currentFullFinal !== recognizedHistory) {
+                        let newWords = "";
+                        
+                        // 안드로이드 중복 누적 버그 방어 로직 (이전 문장을 품고 있다면 꼬리만 자르기)
+                        if (currentFullFinal.startsWith(recognizedHistory)) {
+                            newWords = currentFullFinal.substring(recognizedHistory.length).trim();
+                        } else {
+                            // 완전히 새로운 문장인 경우
+                            newWords = currentFullFinal.trim();
+                        }
+
+                        if (newWords) {
+                            const span = document.createElement('span');
+                            span.textContent = newWords + ' ';
+                            srcFinalText.appendChild(span);
+                            
+                            translateText(newWords); // 새로 추가된 단어만 번역기로 보냄
+                            updateSentenceCount(1);
+                        }
+                        
+                        // 다음 턴을 위해 히스토리 업데이트
+                        recognizedHistory = currentFullFinal; 
+                    }
+                    
+                    // 3. 회색으로 보이는 임시 텍스트도 눈덩이 중복 방지 처리
+                    let displayInterim = currentInterim;
+                    if (displayInterim.startsWith(recognizedHistory)) {
+                        displayInterim = displayInterim.substring(recognizedHistory.length);
+                    }
+                    
+                    srcInterimText.textContent = displayInterim.trim();
                     scrollToBottom(srcContainer);
                 };
 
