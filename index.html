@@ -1,270 +1,493 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IMC 실시간 음성 번역</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
-        
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: #FDFBF7;
-            color: #1A2B4C;
-        }
-        
-        .custom-shadow {
-            box-shadow: 0 4px 20px rgba(26, 43, 76, 0.05);
-        }
-
-        .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-        }
-        .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMC 실시간 음성 번역</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+  body{font-family:'Noto Sans KR',sans-serif;background-color:#FDFBF7;color:#1A2B4C}
+  .custom-shadow{box-shadow:0 4px 20px rgba(26,43,76,.05)}
+  .scrollbar-hide::-webkit-scrollbar{display:none}
+  .scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}
+  .fade{transition:opacity .4s ease}
+  .num{font-variant-numeric:tabular-nums}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
 </head>
 <body class="min-h-screen p-3 md:p-8 flex flex-col items-center bg-[#FDFBF7]">
 
-    <div id="error-message" class="hidden w-full max-w-5xl bg-red-100 text-red-700 p-3 md:p-4 rounded-lg mb-4 text-center font-medium text-sm md:text-base"></div>
+<div id="err" class="hidden w-full max-w-6xl bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-3 text-sm md:text-base"></div>
+<div id="toast" class="hidden fade w-full max-w-6xl bg-blue-50 border border-blue-200 p-3 rounded-xl mb-3 text-center font-medium text-sm"></div>
 
-    <header class="w-full max-w-5xl text-center mb-5 md:mb-8 mt-2 md:mt-4">
-        <h1 class="text-2xl md:text-4xl font-bold text-[#1A2B4C] mb-2 tracking-tight">IMC 실시간 음성 번역</h1>
-        <p class="text-gray-500 text-xs md:text-base px-2">마이크를 통해 한국어로 말씀하시면 실시간으로 번역됩니다.</p>
-    </header>
+<!-- 인식이 멈췄을 때만 나타남. 자동 재시작 대신 사용자가 직접 누름 -->
+<div id="resume-bar" class="hidden w-full max-w-6xl bg-[#1A2B4C] text-white p-3 md:p-4 rounded-xl mb-3 flex flex-col sm:flex-row items-center gap-3">
+  <p id="resume-msg" class="text-sm md:text-base flex-1 text-center sm:text-left">잠시 조용해서 인식이 멈췄습니다.</p>
+  <button id="resume-btn" class="bg-white text-[#1A2B4C] font-bold px-5 py-2.5 rounded-lg hover:bg-gray-100 transition-colors text-sm md:text-base shrink-0 w-full sm:w-auto">▶ 이어서 듣기</button>
+</div>
 
-    <div class="w-full max-w-5xl flex flex-col md:flex-row items-center justify-between bg-white p-4 md:p-6 rounded-2xl custom-shadow mb-6 md:mb-8 border border-gray-100">
-        <div class="flex items-center space-x-2 w-full md:w-auto mb-4 md:mb-0 justify-center md:justify-start bg-gray-50 md:bg-transparent py-2 rounded-lg md:py-0">
-            <div id="status-indicator" class="w-3 h-3 rounded-full bg-gray-300"></div>
-            <span id="status-text" class="text-gray-600 font-medium text-sm md:text-base">대기 중</span>
-        </div>
-        
-        <div class="flex flex-col md:flex-row items-center space-y-3 md:space-y-0 md:space-x-4 w-full md:w-auto">
-            <div class="relative w-full md:w-auto">
-                <select id="target-lang" class="w-full appearance-none bg-gray-50 border border-gray-200 text-[#1A2B4C] py-3 pl-4 pr-10 rounded-xl font-medium text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-[#1A2B4C] cursor-pointer transition-all">
-                    <option value="en" data-name="영어">영어 (English)</option>
-                    <option value="vi" data-name="베트남어">베트남어 (Tiếng Việt)</option>
-                    <option value="zh-CN" data-name="중국어">중국어 (中文)</option>
-                    <option value="ja" data-name="일본어">일본어 (日本語)</option>
-                    <option value="ar" data-name="아랍어">아랍어 (العربية)</option>
-                </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </div>
-            </div>
+<header class="w-full max-w-6xl text-center mb-4 md:mb-6 mt-1">
+  <h1 class="text-2xl md:text-4xl font-bold mb-2 tracking-tight">IMC 실시간 음성 번역</h1>
+  <p class="text-gray-500 text-xs md:text-base px-2">말하는 언어를 고르고 시작을 누르면, 문장이 끝날 때마다 번역됩니다.</p>
+</header>
 
-            <div class="flex space-x-2 md:space-x-4 w-full md:w-auto justify-center">
-                <button id="start-btn" class="bg-[#1A2B4C] hover:bg-[#2A406D] text-white px-4 md:px-8 py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 flex-1 md:flex-none text-sm md:text-base">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                    </svg>
-                    <span>시작</span>
-                </button>
-                <button id="stop-btn" disabled class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 md:px-8 py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed flex-1 md:flex-none text-sm md:text-base">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
-                    </svg>
-                    <span>중지</span>
-                </button>
-            </div>
-        </div>
+<div class="w-full max-w-6xl bg-white p-4 md:p-5 rounded-2xl custom-shadow border border-gray-100 mb-3">
+  <div class="flex flex-col lg:flex-row lg:items-end gap-4">
+
+    <div class="flex items-center gap-2 shrink-0 lg:pb-3">
+      <div id="dot" class="w-3 h-3 rounded-full bg-gray-300 shrink-0"></div>
+      <span id="status" class="font-medium text-sm md:text-base text-gray-600">대기 중</span>
+      <span id="counter" class="text-gray-400 text-xs md:text-sm num">0 / 20문장</span>
     </div>
 
-    <main class="w-full max-w-5xl flex flex-col md:flex-row gap-4 md:gap-6 pb-8">
-        <div class="flex-1 bg-white rounded-2xl custom-shadow border border-gray-100 flex flex-col h-[35vh] sm:h-[40vh] md:h-[60vh]">
-            <div class="p-3 md:p-4 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
-                <h2 class="text-base md:text-lg font-bold text-[#1A2B4C] flex items-center">
-                    <span class="text-xl md:text-2xl mr-2">[KOR]</span> 인식된 한국어
-                </h2>
-            </div>
-            <div id="ko-container" class="p-4 md:p-6 flex-1 overflow-y-auto text-base md:text-lg leading-relaxed text-gray-800 scrollbar-hide">
-                <div id="ko-final-text" class="inline"></div>
-                <div id="ko-interim-text" class="inline text-gray-400 italic"></div>
-            </div>
-        </div>
+    <div class="flex items-end gap-2 flex-1 min-w-0">
+      <div class="relative flex-1 min-w-0">
+        <label for="src-lang" class="block text-[10px] md:text-xs text-gray-400 mb-1 ml-1">말하는 언어</label>
+        <select id="src-lang" class="w-full appearance-none bg-gray-50 border border-gray-200 py-2.5 pl-3 pr-8 rounded-xl font-medium text-xs sm:text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-[#1A2B4C] cursor-pointer">
+          <option value="ko" data-speech="ko-KR" data-name="한국어" selected>한국어 (Korean)</option>
+          <option value="en" data-speech="en-US" data-name="영어">영어 (English)</option>
+          <option value="zh-CN" data-speech="zh-CN" data-name="중국어">중국어 (中文)</option>
+          <option value="ja" data-speech="ja-JP" data-name="일본어">일본어 (日本語)</option>
+          <option value="vi" data-speech="vi-VN" data-name="베트남어">베트남어 (Tiếng Việt)</option>
+          <option value="ar" data-speech="ar-SA" data-name="아랍어">아랍어 (العربية)</option>
+          <option value="es" data-speech="es-ES" data-name="스페인어">스페인어 (Español)</option>
+          <option value="pt" data-speech="pt-BR" data-name="포르투갈어">포르투갈어 (Português)</option>
+          <option value="fr" data-speech="fr-FR" data-name="불어">불어 (Français)</option>
+        </select>
+        <span class="pointer-events-none absolute right-3 bottom-3 text-gray-400 text-xs">▼</span>
+      </div>
 
-        <div class="flex-1 bg-white rounded-2xl custom-shadow border border-gray-100 flex flex-col h-[35vh] sm:h-[40vh] md:h-[60vh]">
-            <div class="p-3 md:p-4 border-b border-gray-100 bg-[#1A2B4C] rounded-t-2xl text-white">
-                <h2 class="text-base md:text-lg font-bold flex items-center">
-                    <span id="trans-title">영어</span> 번역 결과
-                </h2>
-            </div>
-            <div id="en-container" class="p-4 md:p-6 flex-1 overflow-y-auto text-base md:text-lg leading-relaxed text-gray-800 scrollbar-hide">
-                <div id="en-final-text"></div>
-                <div id="translating-indicator" class="hidden mt-2 text-xs md:text-sm text-gray-400 animate-pulse border-l-2 border-[#1A2B4C] pl-2">번역 중...</div>
-            </div>
-        </div>
-    </main>
+      <button id="swap" type="button" title="언어 서로 바꾸기" class="shrink-0 bg-gray-50 hover:bg-gray-200 border border-gray-200 rounded-xl px-3 py-2.5 transition-colors">⇄</button>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const startBtn = document.getElementById('start-btn');
-            const stopBtn = document.getElementById('stop-btn');
-            const statusIndicator = document.getElementById('status-indicator');
-            const statusText = document.getElementById('status-text');
-            const koFinalText = document.getElementById('ko-final-text');
-            const koInterimText = document.getElementById('ko-interim-text');
-            const enFinalText = document.getElementById('en-final-text');
-            const translatingIndicator = document.getElementById('translating-indicator');
-            const koContainer = document.getElementById('ko-container');
-            const enContainer = document.getElementById('en-container');
-            const errorMessage = document.getElementById('error-message');
+      <div class="relative flex-1 min-w-0">
+        <label for="tgt-lang" class="block text-[10px] md:text-xs text-gray-400 mb-1 ml-1">번역할 언어</label>
+        <select id="tgt-lang" class="w-full appearance-none bg-gray-50 border border-gray-200 py-2.5 pl-3 pr-8 rounded-xl font-medium text-xs sm:text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-[#1A2B4C] cursor-pointer">
+          <option value="ko" data-speech="ko-KR" data-name="한국어">한국어 (Korean)</option>
+          <option value="en" data-speech="en-US" data-name="영어" selected>영어 (English)</option>
+          <option value="zh-CN" data-speech="zh-CN" data-name="중국어">중국어 (中文)</option>
+          <option value="ja" data-speech="ja-JP" data-name="일본어">일본어 (日本語)</option>
+          <option value="vi" data-speech="vi-VN" data-name="베트남어">베트남어 (Tiếng Việt)</option>
+          <option value="ar" data-speech="ar-SA" data-name="아랍어">아랍어 (العربية)</option>
+          <option value="es" data-speech="es-ES" data-name="스페인어">스페인어 (Español)</option>
+          <option value="pt" data-speech="pt-BR" data-name="포르투갈어">포르투갈어 (Português)</option>
+          <option value="fr" data-speech="fr-FR" data-name="불어">불어 (Français)</option>
+        </select>
+        <span class="pointer-events-none absolute right-3 bottom-3 text-gray-400 text-xs">▼</span>
+      </div>
+    </div>
 
-            const targetLangSelect = document.getElementById('target-lang');
-            const transTitle = document.getElementById('trans-title');
+    <div class="flex gap-2 shrink-0">
+      <button id="start" class="bg-[#1A2B4C] hover:bg-[#2A406D] text-white px-5 md:px-7 py-3 rounded-xl font-medium transition-colors flex-1 lg:flex-none text-sm md:text-base">🎙 시작</button>
+      <button id="stop" disabled class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-5 md:px-7 py-3 rounded-xl font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-1 lg:flex-none text-sm md:text-base">■ 중지</button>
+    </div>
+  </div>
 
-            let recognition;
-            let isRecording = false;
+  <div class="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 pt-3 border-t border-gray-100 text-xs md:text-sm text-gray-600">
+    <label class="flex items-center gap-2 cursor-pointer">
+      <input type="checkbox" id="opt-auto" class="accent-[#1A2B4C] w-4 h-4">
+      <span>말이 끊겨도 자동으로 계속 듣기</span>
+      <span id="auto-note" class="text-gray-400"></span>
+    </label>
+    <div class="flex-1"></div>
+    <button id="copy" class="hover:bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200">📋 복사</button>
+    <button id="save" class="hover:bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200">💾 저장</button>
+    <button id="clear" class="hover:bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200">🔄 지우기</button>
+  </div>
+</div>
 
-            if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                recognition = new SpeechRecognition();
-                recognition.lang = 'ko-KR';
-                recognition.continuous = true;
-                recognition.interimResults = true;
-                
-                recognition.onstart = () => {
-                    isRecording = true;
-                    statusIndicator.classList.remove('bg-gray-300', 'bg-red-500');
-                    statusIndicator.classList.add('bg-green-500', 'animate-pulse');
-                    statusText.textContent = '음성 인식 중...';
-                    statusText.classList.add('text-green-600');
-                    
-                    startBtn.disabled = true;
-                    stopBtn.disabled = false;
-                    startBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                    stopBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                    errorMessage.classList.add('hidden');
-                };
+<details class="w-full max-w-6xl bg-white rounded-xl border border-gray-100 custom-shadow mb-4 text-sm">
+  <summary class="cursor-pointer px-4 py-3 font-medium select-none">🔍 진단 정보</summary>
+  <div class="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-gray-600">
+    <div>접속 방식 <span id="d-proto" class="float-right font-medium"></span></div>
+    <div>음성 인식 지원 <span id="d-support" class="float-right font-medium"></span></div>
+    <div>세션 시작 횟수 <span id="d-starts" class="float-right font-medium num">0</span></div>
+    <div>마지막 오류 <span id="d-err" class="float-right font-medium">없음</span></div>
+  </div>
+</details>
 
-                recognition.onresult = (event) => {
-                    let interimTranscript = '';
-                    let finalTranscript = '';
+<main class="w-full max-w-6xl flex flex-col md:flex-row gap-4 md:gap-5 pb-6">
+  <section class="md:flex-[1] bg-white rounded-2xl custom-shadow border border-gray-100 flex flex-col h-[30vh] md:h-[62vh]">
+    <div class="p-3 md:p-4 border-b border-gray-100 bg-gray-50/60 rounded-t-2xl flex items-baseline gap-2">
+      <span id="src-tag" class="text-lg md:text-xl font-bold">[KO]</span>
+      <h2 class="text-sm md:text-base font-bold">인식된 <span id="src-name">한국어</span></h2>
+    </div>
+    <div id="src-scroll" dir="auto" class="p-3 md:p-5 flex-1 overflow-y-auto scrollbar-hide text-sm md:text-base leading-relaxed text-gray-700">
+      <div id="src-rows"></div>
+      <p id="interim" class="text-gray-400 italic"></p>
+      <p id="src-empty" class="text-gray-300">시작을 누르고 말씀해 주세요.</p>
+    </div>
+  </section>
 
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        if (event.results[i].isFinal) {
-                            let text = event.results[i][0].transcript.trim();
-                            finalTranscript += text + ' ';
-                            
-                            const span = document.createElement('span');
-                            span.textContent = text + ' ';
-                            koFinalText.appendChild(span);
-                            
-                            translateText(text);
-                        } else {
-                            interimTranscript += event.results[i][0].transcript;
-                        }
-                    }
+  <section class="md:flex-[1.6] bg-white rounded-2xl custom-shadow border border-gray-100 flex flex-col h-[45vh] md:h-[62vh]">
+    <div class="p-3 md:p-4 bg-[#1A2B4C] rounded-t-2xl text-white">
+      <h2 class="text-base md:text-lg font-bold"><span id="tgt-name">영어</span> 번역 결과</h2>
+    </div>
+    <div id="tgt-scroll" dir="auto" class="p-4 md:p-7 flex-1 overflow-y-auto scrollbar-hide text-lg md:text-2xl leading-loose text-gray-800">
+      <div id="tgt-rows"></div>
+      <p id="tgt-empty" class="text-gray-300 text-base">번역 결과가 여기에 표시됩니다.</p>
+    </div>
+  </section>
+</main>
 
-                    koInterimText.textContent = interimTranscript;
-                    scrollToBottom(koContainer);
-                };
+<div class="w-full max-w-6xl bg-white p-3 md:p-4 rounded-2xl custom-shadow border border-gray-100 mb-10">
+  <label for="manual" class="block text-xs text-gray-400 mb-2">마이크 없이 — 직접 입력해서 번역</label>
+  <div class="flex gap-2">
+    <input id="manual" type="text" placeholder="한국어 문장을 입력하고 Enter" class="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-[#1A2B4C]">
+    <button id="manual-go" class="bg-[#1A2B4C] hover:bg-[#2A406D] text-white px-5 py-3 rounded-xl font-medium text-sm md:text-base shrink-0">번역</button>
+  </div>
+</div>
 
-                recognition.onerror = (event) => {
-                    console.error('Speech recognition error', event.error);
-                    if (event.error === 'not-allowed') {
-                        showError('마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크 접근을 허용해주세요.');
-                    } else if (event.error === 'network') {
-                        showError('네트워크 오류가 발생했습니다.');
-                    }
-                    stopRecognition();
-                };
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var e = {
+    err: $('err'), toast: $('toast'), resumeBar: $('resume-bar'), resumeMsg: $('resume-msg'), resumeBtn: $('resume-btn'),
+    dot: $('dot'), status: $('status'), counter: $('counter'),
+    src: $('src-lang'), tgt: $('tgt-lang'), swap: $('swap'), start: $('start'), stop: $('stop'),
+    auto: $('opt-auto'), autoNote: $('auto-note'),
+    copy: $('copy'), save: $('save'), clear: $('clear'),
+    dProto: $('d-proto'), dSupport: $('d-support'), dStarts: $('d-starts'), dErr: $('d-err'),
+    srcTag: $('src-tag'), srcName: $('src-name'), tgtName: $('tgt-name'),
+    srcScroll: $('src-scroll'), srcRows: $('src-rows'), interim: $('interim'), srcEmpty: $('src-empty'),
+    tgtScroll: $('tgt-scroll'), tgtRows: $('tgt-rows'), tgtEmpty: $('tgt-empty'),
+    manual: $('manual'), manualGo: $('manual-go')
+  };
 
-                recognition.onend = () => {
-                    if (isRecording) {
-                        recognition.start();
-                    } else {
-                        statusIndicator.classList.remove('bg-green-500', 'animate-pulse');
-                        statusIndicator.classList.add('bg-gray-300');
-                        statusText.textContent = '대기 중';
-                        statusText.classList.remove('text-green-600');
-                        
-                        startBtn.disabled = false;
-                        stopBtn.disabled = true;
-                        startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                        stopBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                        koInterimText.textContent = '';
-                    }
-                };
-            } else {
-                showError('현재 사용 중인 브라우저는 음성 인식을 지원하지 않습니다. 구글 크롬(Chrome) 브라우저를 이용해주세요.');
-                startBtn.disabled = true;
-                startBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            }
+  var SENTENCE_LIMIT = 20;
+  var CHUNK_MAX = 450;
+  var MIN_GAP = 900;        // start() 호출 사이 최소 간격
+  var DEAD_LIMIT = 2;       // 소리 없이 끝난 세션이 이만큼이면 자동 재시작 포기
 
-            startBtn.addEventListener('click', () => {
-                if (recognition && !isRecording) {
-                    try {
-                        recognition.start();
-                    } catch (e) {
-                        console.error(e);
-                    }
-                }
-            });
+  var isFile = location.protocol === 'file:';
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-            stopBtn.addEventListener('click', () => {
-                stopRecognition();
-            });
+  var rec = null;
+  var wantListen = false;   // 사용자가 듣기를 원하는 상태인가
+  var live = false;         // 세션이 실제로 돌고 있는가
+  var heardAudio = false;   // 이번 세션에서 마이크 소리가 들어왔는가  ★핵심
+  var deadRuns = 0;
+  var startCount = 0;
+  var lastStart = 0;
+  var timer = null;
+  var langRestart = false;
+  var rowNo = 0;
+  var toastTimer = null;
 
-            targetLangSelect.addEventListener('change', (e) => {
-                const selectedOption = e.target.options[e.target.selectedIndex];
-                transTitle.textContent = selectedOption.getAttribute('data-name');
-            });
+  /* file:// 에서는 start() 한 번마다 권한 팝업이 다시 뜰 수 있어 자동 재시작을 기본 해제 */
+  e.auto.checked = !isFile;
+  e.autoNote.textContent = isFile ? '(파일로 직접 열면 팝업이 반복될 수 있어 꺼둡니다)' : '';
 
-            function stopRecognition() {
-                if (recognition && isRecording) {
-                    isRecording = false;
-                    recognition.stop();
-                }
-            }
+  /* ---------- 표시 ---------- */
+  function showErr(m) { e.err.textContent = m; e.err.classList.remove('hidden'); }
+  function hideErr() { e.err.classList.add('hidden'); }
+  function toast(m, ms) {
+    e.toast.textContent = m; e.toast.classList.remove('hidden'); e.toast.style.opacity = '1';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      e.toast.style.opacity = '0';
+      setTimeout(function () { e.toast.classList.add('hidden'); }, 400);
+    }, ms || 2600);
+  }
+  function lang(sel) {
+    var o = sel.options[sel.selectedIndex];
+    return { code: o.value, speech: o.getAttribute('data-speech'), name: o.getAttribute('data-name') };
+  }
+  function setStatus(t, c) { e.status.textContent = t; e.dot.className = 'w-3 h-3 rounded-full shrink-0 ' + c; }
+  function setUi(on) {
+    e.start.disabled = on; e.stop.disabled = !on;
+    e.start.classList.toggle('opacity-40', on);
+    e.start.classList.toggle('cursor-not-allowed', on);
+    if (on) { setStatus('듣고 있습니다', 'bg-green-500 animate-pulse'); hideResume(); }
+    else { setStatus('대기 중', 'bg-gray-300'); e.interim.textContent = ''; }
+  }
+  function showResume(msg) { e.resumeMsg.textContent = msg; e.resumeBar.classList.remove('hidden'); }
+  function hideResume() { e.resumeBar.classList.add('hidden'); }
+  function updateCounter() { e.counter.textContent = rowNo + ' / ' + SENTENCE_LIMIT + '문장'; }
 
-            async function translateText(text) {
-                if (!text) return;
-                
-                translatingIndicator.classList.remove('hidden');
-                
-                try {
-                    const targetLang = targetLangSelect.value;
-                    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=ko|${targetLang}&de=imcdemo@example.com`;
-                    const response = await fetch(url);
-                    const data = await response.json();
+  e.dProto.textContent = isFile ? 'file (파일 직접 열기)' : location.protocol.replace(':', '');
+  e.dSupport.textContent = SR ? '지원' : '미지원';
+  e.dSupport.className = 'float-right font-medium ' + (SR ? 'text-green-600' : 'text-red-600');
 
-                    if (data && data.responseData && data.responseData.translatedText) {
-                        const translatedText = data.responseData.translatedText;
-                        
-                        const p = document.createElement('p');
-                        p.className = 'mb-2';
-                        p.textContent = translatedText;
-                        enFinalText.appendChild(p);
-                        
-                        scrollToBottom(enContainer);
-                    } else {
-                        throw new Error("Translation failed");
-                    }
-                } catch (error) {
-                    console.error('Translation API Error:', error);
-                    const p = document.createElement('p');
-                    p.className = 'mb-2 text-red-500 text-sm';
-                    p.textContent = "[번역을 불러오는 중 오류가 발생했습니다]";
-                    enFinalText.appendChild(p);
-                } finally {
-                    translatingIndicator.classList.add('hidden');
-                }
-            }
+  /* ---------- 음성 인식 ----------
+     getUserMedia 는 쓰지 않습니다. 권한 요청 창구를 하나로 유지해야
+     팝업이 두 번 뜨지 않습니다.                                        */
+  function build() {
+    var r = new SR();
+    r.lang = lang(e.src).speech;
+    r.continuous = true;
+    r.interimResults = true;
+    r.maxAlternatives = 1;
 
-            function scrollToBottom(element) {
-                element.scrollTop = element.scrollHeight;
-            }
+    r.onstart = function () { live = true; lastStart = Date.now(); heardAudio = false; hideErr(); setUi(true); };
 
-            function showError(msg) {
-                errorMessage.textContent = msg;
-                errorMessage.classList.remove('hidden');
-            }
-        });
-    </script>
+    // 마이크에서 소리가 들어왔다는 증거. 재시작 판단의 기준이 됩니다.
+    r.onaudiostart = function () { heardAudio = true; deadRuns = 0; };
+    r.onspeechstart = function () { heardAudio = true; deadRuns = 0; };
+
+    r.onresult = function (ev) {
+      heardAudio = true; deadRuns = 0;
+      var interim = '';
+      for (var i = ev.resultIndex; i < ev.results.length; i++) {
+        if (ev.results[i].isFinal) {
+          var t = (ev.results[i][0] && ev.results[i][0].transcript || '').trim();
+          if (t) addSentence(t);
+        } else { interim += ev.results[i][0].transcript; }
+      }
+      e.interim.textContent = interim;
+      if (interim) e.srcEmpty.classList.add('hidden');
+      e.srcScroll.scrollTop = e.srcScroll.scrollHeight;
+    };
+
+    r.onerror = function (ev) {
+      e.dErr.textContent = ev.error;
+      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+        wantListen = false;
+        showErr('마이크 사용이 차단되었습니다. 주소창 왼쪽 아이콘 → 마이크 → 허용으로 바꾼 뒤 다시 시작해 주세요.');
+      } else if (ev.error === 'audio-capture') {
+        wantListen = false;
+        showErr('마이크 입력을 가져올 수 없습니다. 마이크 연결과, 다른 프로그램이 마이크를 쓰고 있는지 확인해 주세요.');
+      } else if (ev.error === 'network') {
+        wantListen = false;
+        showErr('네트워크 오류입니다. Chrome 음성 인식은 인터넷 연결이 필요합니다.');
+      }
+      // no-speech / aborted 는 정상 상황 → onend 에서 판단
+    };
+
+    r.onend = function () {
+      live = false;
+
+      if (langRestart) { langRestart = false; if (wantListen) queue(200); return; }
+
+      if (!wantListen) { setUi(false); return; }
+
+      // 소리가 한 번도 안 들어온 세션 → 권한/장치 문제일 가능성.
+      // 절대 자동 재시작하지 않습니다. 이게 팝업 무한 반복을 막는 지점입니다.
+      if (!heardAudio) {
+        deadRuns++;
+        if (deadRuns >= DEAD_LIMIT) {
+          wantListen = false; deadRuns = 0; setUi(false);
+          showResume(isFile
+            ? '마이크가 열리지 않았습니다. 파일을 직접 열면 브라우저가 권한을 기억하지 못합니다 — 아래 버튼으로 다시 시도하거나, 계속 반복되면 http://localhost 로 열어주세요.'
+            : '마이크가 열리지 않았습니다. 권한을 확인한 뒤 다시 시도해 주세요.');
+          return;
+        }
+      }
+
+      if (e.auto.checked) { queue(MIN_GAP); return; }
+
+      wantListen = false;
+      setUi(false);
+      showResume('잠시 조용해서 인식이 멈췄습니다. 이어서 들으려면 눌러주세요.');
+    };
+
+    return r;
+  }
+
+  function queue(delay) {
+    clearTimeout(timer);
+    var wait = Math.max(delay, MIN_GAP - (Date.now() - lastStart));
+    timer = setTimeout(go, wait < 0 ? 0 : wait);
+  }
+
+  function go() {
+    if (!rec || !wantListen || live) return;
+    startCount++; e.dStarts.textContent = String(startCount);
+    try { rec.start(); }
+    catch (ex) {
+      if (ex && ex.name === 'InvalidStateError') return;   // 이미 실행 중
+      e.dErr.textContent = ex.name || 'start 실패';
+      wantListen = false; setUi(false);
+      showErr('음성 인식을 시작할 수 없습니다: ' + (ex.message || ex.name));
+    }
+  }
+
+  function beginListening() {
+    if (!SR) { showErr('이 브라우저는 음성 인식을 지원하지 않습니다. 데스크톱 Chrome 또는 Edge를 사용해 주세요. 아래 직접 입력은 그대로 됩니다.'); return; }
+    if (wantListen) return;
+    if (!rec) rec = build();
+    rec.lang = lang(e.src).speech;
+    wantListen = true; deadRuns = 0;
+    hideResume(); hideErr();
+    setStatus('마이크 준비 중...', 'bg-amber-400 animate-pulse');
+    go();
+  }
+
+  e.start.addEventListener('click', beginListening);
+  e.resumeBtn.addEventListener('click', beginListening);
+
+  e.stop.addEventListener('click', function () {
+    wantListen = false; clearTimeout(timer); hideResume();
+    if (rec && live) { try { rec.stop(); } catch (ex) {} } else { setUi(false); }
+  });
+
+  /* ---------- 언어 ---------- */
+  var prevS = e.src.value, prevT = e.tgt.value;
+  function paint() {
+    var s = lang(e.src), t = lang(e.tgt);
+    e.srcName.textContent = s.name;
+    e.srcTag.textContent = '[' + s.code.split('-')[0].toUpperCase() + ']';
+    e.tgtName.textContent = t.name;
+    e.manual.placeholder = s.name + ' 문장을 입력하고 Enter';
+  }
+  function applyLang() {
+    if (!rec) return;
+    rec.lang = lang(e.src).speech;
+    if (!wantListen || !live) return;
+    if (isFile) {
+      // 여기서 재시작하면 권한 팝업이 또 뜰 수 있어 다음 시작 때 적용합니다.
+      toast('말하는 언어는 중지 후 다시 시작하면 적용됩니다.');
+    } else {
+      langRestart = true;
+      try { rec.stop(); } catch (ex) {}
+      toast('말하는 언어를 ' + lang(e.src).name + '로 바꿨습니다.');
+    }
+  }
+  e.src.addEventListener('change', function () {
+    if (e.src.value === e.tgt.value) e.tgt.value = prevS;
+    prevS = e.src.value; prevT = e.tgt.value; paint(); applyLang();
+  });
+  e.tgt.addEventListener('change', function () {
+    if (e.tgt.value === e.src.value) e.src.value = prevT;
+    prevS = e.src.value; prevT = e.tgt.value; paint(); applyLang();
+  });
+  e.swap.addEventListener('click', function () {
+    var s = e.src.value; e.src.value = e.tgt.value; e.tgt.value = s;
+    prevS = e.src.value; prevT = e.tgt.value; paint(); applyLang();
+  });
+
+  /* ---------- 문장 / 20문장 리셋 ---------- */
+  function clearPanels(msg) {
+    e.srcRows.innerHTML = ''; e.tgtRows.innerHTML = '';
+    rowNo = 0; updateCounter();
+    e.srcEmpty.classList.remove('hidden'); e.tgtEmpty.classList.remove('hidden');
+    if (msg) toast(msg);
+  }
+
+  function addSentence(text) {
+    if (rowNo >= SENTENCE_LIMIT) clearPanels('🧹 20문장이 넘어 화면을 정리했습니다. 계속 말씀하세요.');
+    rowNo++;
+    e.srcEmpty.classList.add('hidden'); e.tgtEmpty.classList.add('hidden');
+
+    var sRow = document.createElement('p');
+    sRow.className = 'mb-2 flex gap-2';
+    var sNo = document.createElement('span');
+    sNo.className = 'num text-gray-300 text-xs pt-1 shrink-0 w-5 text-right';
+    sNo.textContent = String(rowNo);
+    var sTxt = document.createElement('span');
+    sTxt.textContent = text;
+    sRow.appendChild(sNo); sRow.appendChild(sTxt);
+    e.srcRows.appendChild(sRow);
+
+    // 번역이 들어갈 자리를 미리 만들어 두면 응답 순서가 뒤바뀌어도 줄이 어긋나지 않습니다.
+    var tRow = document.createElement('p');
+    tRow.className = 'mb-4 flex gap-3';
+    var tNo = document.createElement('span');
+    tNo.className = 'num text-gray-300 text-xs pt-2 shrink-0 w-5 text-right';
+    tNo.textContent = String(rowNo);
+    var slot = document.createElement('span');
+    slot.className = 'text-gray-300 animate-pulse text-base';
+    slot.textContent = '번역 중...';
+    tRow.appendChild(tNo); tRow.appendChild(slot);
+    e.tgtRows.appendChild(tRow);
+
+    updateCounter();
+    e.srcScroll.scrollTop = e.srcScroll.scrollHeight;
+    e.tgtScroll.scrollTop = e.tgtScroll.scrollHeight;
+    translate(text, slot);
+  }
+
+  /* ---------- 번역 ---------- */
+  function split(text) {
+    if (text.length <= CHUNK_MAX) return [text];
+    var parts = [], buf = '';
+    text.split(/\s+/).forEach(function (w) {
+      if ((buf + ' ' + w).trim().length > CHUNK_MAX) { if (buf.trim()) parts.push(buf.trim()); buf = w; }
+      else { buf += ' ' + w; }
+    });
+    if (buf.trim()) parts.push(buf.trim());
+    return parts;
+  }
+
+  function api(q, from, to) {
+    var url = 'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(q)
+      + '&langpair=' + encodeURIComponent(from) + '|' + encodeURIComponent(to);
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (d) {
+      var out = d && d.responseData ? d.responseData.translatedText : '';
+      if (!out) throw new Error('빈 응답');
+      if (/MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID (SOURCE|TARGET) LANGUAGE/i.test(out)) {
+        throw new Error(/LENGTH/i.test(out) ? '문장이 너무 깁니다' : '무료 번역 사용량을 초과했습니다');
+      }
+      return out;
+    });
+  }
+
+  function translate(text, slot) {
+    var from = e.src.value, to = e.tgt.value;
+    if (from === to) { fill(slot, text); return; }
+    Promise.all(split(text).map(function (c) { return api(c, from, to); }))
+      .then(function (p) { fill(slot, p.join(' ')); })
+      .catch(function (ex) {
+        if (!slot.isConnected) return;
+        slot.className = 'text-red-500 text-sm';
+        slot.textContent = '[번역 실패: ' + (ex.message || '알 수 없는 오류') + ']';
+      });
+  }
+
+  function fill(slot, v) {
+    if (!slot.isConnected) return;   // 화면이 리셋되었으면 버림
+    slot.className = ''; slot.textContent = v;
+    e.tgtScroll.scrollTop = e.tgtScroll.scrollHeight;
+  }
+
+  /* ---------- 직접 입력 ---------- */
+  function manualGo() {
+    var v = e.manual.value.trim();
+    if (!v) return;
+    addSentence(v); e.manual.value = '';
+  }
+  e.manualGo.addEventListener('click', manualGo);
+  e.manual.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') manualGo(); });
+
+  /* ---------- 복사 / 저장 / 지우기 ---------- */
+  function transcript() {
+    var s = lang(e.src), t = lang(e.tgt), out = [];
+    var sr = e.srcRows.querySelectorAll('p'), tr = e.tgtRows.querySelectorAll('p');
+    for (var i = 0; i < sr.length; i++) {
+      var a = sr[i].textContent.replace(/^\s*\d+\s*/, '').trim();
+      var b = tr[i] ? tr[i].textContent.replace(/^\s*\d+\s*/, '').trim() : '';
+      out.push((i + 1) + '. [' + s.name + '] ' + a + '\n   [' + t.name + '] ' + b);
+    }
+    return 'IMC 실시간 음성 번역 기록 — ' + new Date().toLocaleString('ko-KR') + '\n\n' + out.join('\n\n');
+  }
+  e.copy.addEventListener('click', function () {
+    var txt = transcript();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(function () { toast('📋 복사했습니다.'); })
+        .catch(function () { toast('복사에 실패했습니다.'); });
+    } else { toast('이 브라우저에서는 복사를 지원하지 않습니다.'); }
+  });
+  e.save.addEventListener('click', function () {
+    var url = URL.createObjectURL(new Blob([transcript()], { type: 'text/plain;charset=utf-8' }));
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'IMC_번역기록_' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.txt';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  });
+  e.clear.addEventListener('click', function () { clearPanels('화면을 지웠습니다.'); });
+
+  /* ---------- 초기화 ---------- */
+  if (!SR) {
+    showErr('이 브라우저는 음성 인식(Web Speech API)을 지원하지 않습니다. 데스크톱 Chrome 또는 Edge에서 열어주세요. 아래 "직접 입력"은 그대로 사용할 수 있습니다.');
+    e.start.disabled = true;
+    e.start.classList.add('opacity-40', 'cursor-not-allowed');
+  }
+  paint(); updateCounter();
+});
+</script>
 </body>
 </html>
