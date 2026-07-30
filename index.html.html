@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IMC 실시간 음성 번역</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #FDFBF7;
+            color: #1A2B4C;
+        }
+        
+        .custom-shadow {
+            box-shadow: 0 4px 20px rgba(26, 43, 76, 0.05);
+        }
+
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-3 md:p-8 flex flex-col items-center bg-[#FDFBF7]">
+
+    <div id="error-message" class="hidden w-full max-w-5xl bg-red-100 text-red-700 p-3 md:p-4 rounded-lg mb-4 text-center font-medium text-sm md:text-base"></div>
+
+    <header class="w-full max-w-5xl text-center mb-5 md:mb-8 mt-2 md:mt-4">
+        <h1 class="text-2xl md:text-4xl font-bold text-[#1A2B4C] mb-2 tracking-tight">IMC 실시간 음성 번역</h1>
+        <p class="text-gray-500 text-xs md:text-base px-2">마이크를 통해 한국어로 말씀하시면 실시간으로 번역됩니다.</p>
+    </header>
+
+    <div class="w-full max-w-5xl flex flex-col md:flex-row items-center justify-between bg-white p-4 md:p-6 rounded-2xl custom-shadow mb-6 md:mb-8 border border-gray-100">
+        <div class="flex items-center space-x-2 w-full md:w-auto mb-4 md:mb-0 justify-center md:justify-start bg-gray-50 md:bg-transparent py-2 rounded-lg md:py-0">
+            <div id="status-indicator" class="w-3 h-3 rounded-full bg-gray-300"></div>
+            <span id="status-text" class="text-gray-600 font-medium text-sm md:text-base">대기 중</span>
+        </div>
+        
+        <div class="flex flex-col md:flex-row items-center space-y-3 md:space-y-0 md:space-x-4 w-full md:w-auto">
+            <div class="relative w-full md:w-auto">
+                <select id="target-lang" class="w-full appearance-none bg-gray-50 border border-gray-200 text-[#1A2B4C] py-3 pl-4 pr-10 rounded-xl font-medium text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-[#1A2B4C] cursor-pointer transition-all">
+                    <option value="en" data-name="영어">영어 (English)</option>
+                    <option value="vi" data-name="베트남어">베트남어 (Tiếng Việt)</option>
+                    <option value="zh-CN" data-name="중국어">중국어 (中文)</option>
+                    <option value="ja" data-name="일본어">일본어 (日本語)</option>
+                    <option value="ar" data-name="아랍어">아랍어 (العربية)</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+            </div>
+
+            <div class="flex space-x-2 md:space-x-4 w-full md:w-auto justify-center">
+                <button id="start-btn" class="bg-[#1A2B4C] hover:bg-[#2A406D] text-white px-4 md:px-8 py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 flex-1 md:flex-none text-sm md:text-base">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                    <span>시작</span>
+                </button>
+                <button id="stop-btn" disabled class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 md:px-8 py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed flex-1 md:flex-none text-sm md:text-base">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                    </svg>
+                    <span>중지</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main class="w-full max-w-5xl flex flex-col md:flex-row gap-4 md:gap-6 pb-8">
+        <div class="flex-1 bg-white rounded-2xl custom-shadow border border-gray-100 flex flex-col h-[35vh] sm:h-[40vh] md:h-[60vh]">
+            <div class="p-3 md:p-4 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
+                <h2 class="text-base md:text-lg font-bold text-[#1A2B4C] flex items-center">
+                    <span class="text-xl md:text-2xl mr-2">[KOR]</span> 인식된 한국어
+                </h2>
+            </div>
+            <div id="ko-container" class="p-4 md:p-6 flex-1 overflow-y-auto text-base md:text-lg leading-relaxed text-gray-800 scrollbar-hide">
+                <div id="ko-final-text" class="inline"></div>
+                <div id="ko-interim-text" class="inline text-gray-400 italic"></div>
+            </div>
+        </div>
+
+        <div class="flex-1 bg-white rounded-2xl custom-shadow border border-gray-100 flex flex-col h-[35vh] sm:h-[40vh] md:h-[60vh]">
+            <div class="p-3 md:p-4 border-b border-gray-100 bg-[#1A2B4C] rounded-t-2xl text-white">
+                <h2 class="text-base md:text-lg font-bold flex items-center">
+                    <span id="trans-title">영어</span> 번역 결과
+                </h2>
+            </div>
+            <div id="en-container" class="p-4 md:p-6 flex-1 overflow-y-auto text-base md:text-lg leading-relaxed text-gray-800 scrollbar-hide">
+                <div id="en-final-text"></div>
+                <div id="translating-indicator" class="hidden mt-2 text-xs md:text-sm text-gray-400 animate-pulse border-l-2 border-[#1A2B4C] pl-2">번역 중...</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const statusIndicator = document.getElementById('status-indicator');
+            const statusText = document.getElementById('status-text');
+            const koFinalText = document.getElementById('ko-final-text');
+            const koInterimText = document.getElementById('ko-interim-text');
+            const enFinalText = document.getElementById('en-final-text');
+            const translatingIndicator = document.getElementById('translating-indicator');
+            const koContainer = document.getElementById('ko-container');
+            const enContainer = document.getElementById('en-container');
+            const errorMessage = document.getElementById('error-message');
+
+            const targetLangSelect = document.getElementById('target-lang');
+            const transTitle = document.getElementById('trans-title');
+
+            let recognition;
+            let isRecording = false;
+
+            if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.lang = 'ko-KR';
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                
+                recognition.onstart = () => {
+                    isRecording = true;
+                    statusIndicator.classList.remove('bg-gray-300', 'bg-red-500');
+                    statusIndicator.classList.add('bg-green-500', 'animate-pulse');
+                    statusText.textContent = '음성 인식 중...';
+                    statusText.classList.add('text-green-600');
+                    
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    stopBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    errorMessage.classList.add('hidden');
+                };
+
+                recognition.onresult = (event) => {
+                    let interimTranscript = '';
+                    let finalTranscript = '';
+
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            let text = event.results[i][0].transcript.trim();
+                            finalTranscript += text + ' ';
+                            
+                            const span = document.createElement('span');
+                            span.textContent = text + ' ';
+                            koFinalText.appendChild(span);
+                            
+                            translateText(text);
+                        } else {
+                            interimTranscript += event.results[i][0].transcript;
+                        }
+                    }
+
+                    koInterimText.textContent = interimTranscript;
+                    scrollToBottom(koContainer);
+                };
+
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error', event.error);
+                    if (event.error === 'not-allowed') {
+                        showError('마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크 접근을 허용해주세요.');
+                    } else if (event.error === 'network') {
+                        showError('네트워크 오류가 발생했습니다.');
+                    }
+                    stopRecognition();
+                };
+
+                recognition.onend = () => {
+                    if (isRecording) {
+                        recognition.start();
+                    } else {
+                        statusIndicator.classList.remove('bg-green-500', 'animate-pulse');
+                        statusIndicator.classList.add('bg-gray-300');
+                        statusText.textContent = '대기 중';
+                        statusText.classList.remove('text-green-600');
+                        
+                        startBtn.disabled = false;
+                        stopBtn.disabled = true;
+                        startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                        stopBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                        koInterimText.textContent = '';
+                    }
+                };
+            } else {
+                showError('현재 사용 중인 브라우저는 음성 인식을 지원하지 않습니다. 구글 크롬(Chrome) 브라우저를 이용해주세요.');
+                startBtn.disabled = true;
+                startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+
+            startBtn.addEventListener('click', () => {
+                if (recognition && !isRecording) {
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }
+            });
+
+            stopBtn.addEventListener('click', () => {
+                stopRecognition();
+            });
+
+            targetLangSelect.addEventListener('change', (e) => {
+                const selectedOption = e.target.options[e.target.selectedIndex];
+                transTitle.textContent = selectedOption.getAttribute('data-name');
+            });
+
+            function stopRecognition() {
+                if (recognition && isRecording) {
+                    isRecording = false;
+                    recognition.stop();
+                }
+            }
+
+            async function translateText(text) {
+                if (!text) return;
+                
+                translatingIndicator.classList.remove('hidden');
+                
+                try {
+                    const targetLang = targetLangSelect.value;
+                    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=ko|${targetLang}&de=imcdemo@example.com`;
+                    const response = await fetch(url);
+                    const data = await response.json();
+
+                    if (data && data.responseData && data.responseData.translatedText) {
+                        const translatedText = data.responseData.translatedText;
+                        
+                        const p = document.createElement('p');
+                        p.className = 'mb-2';
+                        p.textContent = translatedText;
+                        enFinalText.appendChild(p);
+                        
+                        scrollToBottom(enContainer);
+                    } else {
+                        throw new Error("Translation failed");
+                    }
+                } catch (error) {
+                    console.error('Translation API Error:', error);
+                    const p = document.createElement('p');
+                    p.className = 'mb-2 text-red-500 text-sm';
+                    p.textContent = "[번역을 불러오는 중 오류가 발생했습니다]";
+                    enFinalText.appendChild(p);
+                } finally {
+                    translatingIndicator.classList.add('hidden');
+                }
+            }
+
+            function scrollToBottom(element) {
+                element.scrollTop = element.scrollHeight;
+            }
+
+            function showError(msg) {
+                errorMessage.textContent = msg;
+                errorMessage.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
